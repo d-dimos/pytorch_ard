@@ -19,8 +19,10 @@ class LinearARD(nn.Module):
         self.thresh = thresh
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
+            self.bias_exists = True
         else:
             self.register_parameter('bias', None)
+            self.bias_exists = False
         self.ard_init = ard_init
         self.log_sigma2 = Parameter(torch.Tensor(out_features, in_features))
         self.reset_parameters()
@@ -33,10 +35,15 @@ class LinearARD(nn.Module):
 
             epsilon = W_std.new(W_std.shape).normal_()
             output = W_mu + W_std * epsilon
-            if self.bias: output += self.bias
+            if self.bias_exists:
+                output += self.bias
         else:
             W = self.weights_clipped
-            output = F.linear(input, W) + self.bias
+            # output = F.linear(input, W) + self.bias
+            if self.bias_exists:
+                output = F.linear(input, W) + self.bias
+            else:
+                output = F.linear(input, W)
         return output
 
     @property
@@ -102,7 +109,7 @@ class Conv2dARD(nn.Conv2d):
         """
         Forward with all regularized connections and random activations (Beyesian mode). Typically used for train
         """
-        if self.training == False:
+        if not self.training:
             return F.conv2d(input, self.weights_clipped,
                             self.bias, self.stride,
                             self.padding, self.dilation, self.groups)
