@@ -30,7 +30,7 @@ class LinearARD(nn.Module):
     def forward(self, input):
         if self.training:
             W_mu = F.linear(input, self.weight)
-            std_w = torch.exp(self.log_alpha).permute(1,0)
+            std_w = torch.exp(self.log_alpha()).permute(1,0)
             W_std = torch.sqrt((input.pow(2)).matmul(std_w*(self.weight.permute(1,0)**2)) + 1e-15)
 
             epsilon = W_std.new(W_std.shape).normal_()
@@ -58,7 +58,7 @@ class LinearARD(nn.Module):
         self.log_sigma2.data.fill_(self.ard_init)
 
     def get_clip_mask(self):
-        log_alpha = self.log_alpha
+        log_alpha = self.log_alpha()
         return torch.ge(log_alpha, self.thresh)
 
     def get_reg(self, **kwargs):
@@ -67,8 +67,8 @@ class LinearARD(nn.Module):
         """
         k1, k2, k3 = 0.63576, 1.8732, 1.48695
         C = -k1
-        mdkl = k1 * torch.sigmoid(k2 + k3 * self.log_alpha) - \
-            0.5 * torch.log1p(torch.exp(-self.log_alpha)) + C
+        mdkl = k1 * torch.sigmoid(k2 + k3 * self.log_alpha()) - \
+            0.5 * torch.log1p(torch.exp(-self.log_alpha())) + C
         return -torch.sum(mdkl)
 
     def extra_repr(self):
@@ -117,7 +117,7 @@ class Conv2dARD(nn.Conv2d):
 
         conved_mu = F.conv2d(input, W, self.bias, self.stride,
                              self.padding, self.dilation, self.groups)
-        log_alpha = self.log_alpha
+        log_alpha = self.log_alpha()
         conved_si = torch.sqrt(1e-15 + F.conv2d(input * input,
                                                 torch.exp(log_alpha) * W *
                                                 W, self.bias, self.stride,
@@ -134,7 +134,7 @@ class Conv2dARD(nn.Conv2d):
         return torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
 
     def get_clip_mask(self):
-        log_alpha = self.log_alpha
+        log_alpha = self.log_alpha()
         return torch.ge(log_alpha, self.thresh)
 
     def get_reg(self, **kwargs):
@@ -143,7 +143,7 @@ class Conv2dARD(nn.Conv2d):
         """
         k1, k2, k3 = 0.63576, 1.8732, 1.48695
         C = -k1
-        log_alpha = self.log_alpha
+        log_alpha = self.log_alpha()
         mdkl = k1 * torch.sigmoid(k2 + k3 * log_alpha) - \
             0.5 * torch.log1p(torch.exp(-log_alpha)) + C
         return -torch.sum(mdkl)
